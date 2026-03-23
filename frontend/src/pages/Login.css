@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.login-bg {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a1628 0%, #112544 50%, #0e2e46 100%);
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 4rem 3.5rem 2.5rem;
+  width: 100%;
+  max-width: 620px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 460px;
+  justify-content: space-between;
+}
+
+.step-content { flex: 1; }
+
+.welcome-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 52px;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.2;
+  margin-bottom: 2.5rem;
+}
+
+.input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e0ddd8;
+  border-radius: 12px;
+  padding: 16px 20px;
+  background: #faf9f7;
+}
+.input-wrap:focus-within { border-color: #a0a09a; }
+
+.input-icon { font-size: 18px; color: #999; }
+
+.input-wrap input {
+  border: none;
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 17px;
+  color: #1a1a1a;
+  width: 100%;
+  outline: none;
+}
+
+.err {
+  font-size: 13px;
+  color: #c0392b;
+  margin-top: 10px;
+}
+
+.forgot-link {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #999;
+  text-decoration: none;
+}
+.forgot-link:hover { color: #555; }
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid #f0ede8;
+}
+
+.school-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.school-logo-img {
+  width: 65px;
+  height: 58px;
+  flex-shrink: 0;
+}
+
+.school-name-main {
+  font-size: 35px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-family: 'Cormorant Garamond', serif;
+  line-height: 1.2;
+}
+
+.school-name-sub {
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
+  line-height: 1.4;
+  max-width: 200px;
+}
+
+.footer-btns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.next-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.next-btn:hover { background: #333; }
+.next-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.back-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.back-btn:hover { background: #333; }
+
+.hint {
+  font-size: 20px;
+  color: #999;
+  font-weight: 300;
+  margin-bottom: 1.7rem;
+  line-height: 1.5;
+}
+
+.access-denied-card {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 360px;
+}
+
+.access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.denied-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #fdecea;
+  border: 2px solid #f5c6c2;
+  color: #c0392b;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.denied-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 40px;
+  font-weight: 600;
+  color: #c0392b;
+}
+
+.denied-msg {
+  font-size: 20px;
+  color: #1a1a1a;
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+.denied-btn {
+  margin-top: 8px;
+  padding: 16px 30px;
+  border-radius: 50px;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.denied-btn:hover { background: #333; }
