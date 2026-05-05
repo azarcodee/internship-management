@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, Search, GraduationCap } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, GraduationCap, AlertTriangle } from "lucide-react";
 import { apiFetch, API_BASE } from "../../lib/api";
 import { Button } from "../ui/button";
 import { Input, Label } from "../ui/input";
@@ -46,6 +46,7 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [deleteId, setDeleteId] = useState(null);
+  const [duplicateWarning, setDuplicateWarning] = useState("");
 
   const specFilters = ["Tous", ...SPECIALITES];
 
@@ -66,11 +67,43 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
     });
   }, [etudiants, search, filterSpec]);
 
+  // ── Check for duplicate student (same nom + prenom) ──
+  function checkDuplicate(nom, prenom) {
+    if (!nom.trim() || !prenom.trim()) {
+      setDuplicateWarning("");
+      return false;
+    }
+
+    const nomLower = nom.trim().toLowerCase();
+    const prenomLower = prenom.trim().toLowerCase();
+
+    const duplicate = etudiants.find((e) => {
+      // Exclude current student when editing
+      if (editId && e.id === editId) return false;
+      return (
+        e.nom.toLowerCase() === nomLower &&
+        e.prenom.toLowerCase() === prenomLower
+      );
+    });
+
+    if (duplicate) {
+      setDuplicateWarning(
+        `Un étudiant nommé "${duplicate.prenom} ${duplicate.nom}" existe déjà (${duplicate.specialite}, ${duplicate.annee}ème année).`
+      );
+      return true;
+    } else {
+      setDuplicateWarning("");
+      return false;
+    }
+  }
+
   function openAdd() {
     setForm({ ...EMPTY_FORM });
     setEditId(null);
+    setDuplicateWarning("");
     setModalOpen(true);
   }
+
   function openEdit(e) {
     setForm({
       nom: e.nom,
@@ -80,10 +113,30 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
       classe: e.classe ?? "",
     });
     setEditId(e.id);
+    setDuplicateWarning("");
     setModalOpen(true);
   }
+
   async function handleSave() {
-    const data = { ...form, classe: form.classe || null };
+    // Check for empty fields
+    if (!form.nom.trim() || !form.prenom.trim()) {
+      setDuplicateWarning("Le nom et le prénom sont requis.");
+      return;
+    }
+
+    // Check for duplicate
+    if (checkDuplicate(form.nom, form.prenom)) {
+      return; // Don't save — duplicate found
+    }
+
+    const data = {
+      nom: form.nom.trim(),
+      prenom: form.prenom.trim(),
+      specialite: form.specialite,
+      annee: form.annee,
+      classe: form.classe || null,
+    };
+
     if (editId) {
       const result = await apiFetch(`/etudiants.php?id=${editId}`, {
         method: "PUT",
@@ -91,10 +144,9 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
       });
       if (result && !result.error) {
         await reload();
+        setModalOpen(false);
       } else {
-        setEtudiants((prev) =>
-          prev.map((e) => (e.id === editId ? { ...data, id: editId } : e)),
-        );
+        setDuplicateWarning(result?.error ?? "Erreur lors de la modification.");
       }
     } else {
       const result = await apiFetch("/etudiants.php", {
@@ -103,12 +155,13 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
       });
       if (result && !result.error) {
         await reload();
+        setModalOpen(false);
       } else {
-        setEtudiants((prev) => [...prev, { ...data, id: genId() }]);
+        setDuplicateWarning(result?.error ?? "Erreur lors de l'ajout.");
       }
     }
-    setModalOpen(false);
   }
+
   async function handleDelete() {
     const result = await apiFetch(`/etudiants.php?id=${deleteId}`, {
       method: "DELETE",
@@ -120,6 +173,7 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
     }
     setDeleteId(null);
   }
+
   function setField(key, val) {
     setForm((f) => {
       const next = { ...f, [key]: val };
@@ -127,13 +181,20 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
         const max = getCursus(val);
         if (Number(next.annee) > max) next.annee = String(max);
       }
+      // Check duplicate when name or prenom changes
+      if (key === "nom" || key === "prenom") {
+        const nomToCheck = key === "nom" ? val : next.nom;
+        const prenomToCheck = key === "prenom" ? val : next.prenom;
+        // Use setTimeout to let state update first
+        setTimeout(() => checkDuplicate(nomToCheck, prenomToCheck), 0);
+      }
       return next;
     });
   }
 
   return (
     <div className="space-y-5">
-      {/* ── Search bar — VERY TOP ── */}
+      {/* ── Search bar ── */}
       <div className="relative">
         <Search
           className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4"
@@ -194,7 +255,7 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
 
       {/* ── Specialty filter pills ── */}
       <div className="flex gap-2 flex-wrap">
-        {specFilters.slice(0, 5).map((sp) => (
+        {specFilters.slice(0, 9).map((sp) => (
           <button
             key={sp}
             onClick={() => setFilterSpec(sp)}
@@ -235,7 +296,7 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
                   >
                     {h}
                   </th>
-                ),
+                )
               )}
             </tr>
           </thead>
@@ -385,6 +446,26 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
                 />
               </div>
             </div>
+
+            {/* ══════ DUPLICATE WARNING ══════ */}
+            {duplicateWarning && (
+              <div
+                className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-medium"
+                style={{
+                  background: "#FFF6E6",
+                  border: "1px solid rgba(251,191,36,0.35)",
+                  color: "#92400E",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                <AlertTriangle
+                  size={14}
+                  style={{ color: "#b8860b", flexShrink: 0, marginTop: 1 }}
+                />
+                <span>{duplicateWarning}</span>
+              </div>
+            )}
+
             <div>
               <Label>Spécialité</Label>
               <Select

@@ -5,6 +5,7 @@ import {
   ClipboardList,
   BarChart3,
   Stethoscope,
+  Users,
   LogOut,
   User,
 } from "lucide-react";
@@ -17,6 +18,7 @@ const ICONS = {
   ClipboardList,
   BarChart3,
   Stethoscope,
+  Users,
 };
 
 export function Sidebar({ page, setPage, user, onLogout }) {
@@ -34,24 +36,9 @@ export function Sidebar({ page, setPage, user, onLogout }) {
         style={{ borderBottom: "1px solid var(--border-dark)" }}
       >
         <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: "#1a1a1a" }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-            >
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </div>
           <div>
             <span
-              className="text-lg font-semibold tracking-tight"
+              className="text-3xl font-semibold tracking-tight"
               style={{
                 fontFamily: "'Cormorant Garamond', serif",
                 color: "var(--text-on-dark)",
@@ -60,7 +47,7 @@ export function Sidebar({ page, setPage, user, onLogout }) {
               INSFP
             </span>
             <p
-              className="text-[10px] mt-0.5"
+              className="text-[15px] mt-0.5"
               style={{
                 color: "var(--text-muted-dark)",
                 fontFamily: "'DM Sans', sans-serif",
@@ -134,7 +121,7 @@ export function Sidebar({ page, setPage, user, onLogout }) {
                 {user.email}
               </p>
               <p
-                className="text-[10px]"
+                className="text-[15px]"
                 style={{ color: "var(--text-muted-dark)" }}
               >
                 Administrateur

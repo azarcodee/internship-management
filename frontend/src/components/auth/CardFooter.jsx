@@ -11,7 +11,6 @@ export default function CardFooter({ onNext, loading, showBack, onBack }) {
   return (
     <div className="card-footer">
       <div className="school-identity">
-        <img src="/iconlogoam.svg" alt="INSFP" className="school-logo-img" />
         <div>
           <div className="school-name-main">INSFP</div>
           <div className="school-name-sub">Institut National de Formation Supérieure Paramédicale</div>

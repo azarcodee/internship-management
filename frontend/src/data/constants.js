@@ -71,6 +71,7 @@ export const NAV_ITEMS = [
   { id: "etudiants",      icon: "GraduationCap",   label: "Étudiants" },
   { id: "etablissements", icon: "Building2",        label: "Établissements" },
   { id: "services",       icon: "Stethoscope",      label: "Services" },
+  { id: "groupes",        icon: "Users",            label: "Groupes" },
   { id: "stages",         icon: "ClipboardList",    label: "Stages" },
   { id: "reports",        icon: "BarChart3",        label: "Rapports" },
 ];

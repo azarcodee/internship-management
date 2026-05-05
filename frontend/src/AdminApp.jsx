@@ -8,6 +8,7 @@ import { Stages } from "./components/sections/Stages";
 import { Reports } from "./components/sections/Reports";
 import { useAuth } from "./context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { Groupes } from "./components/sections/Groupes";
 
 const API_BASE = "http://localhost/internship-management/backend";
 
@@ -111,6 +112,12 @@ export default function AdminApp() {
             stages={stages}
           />
         );
+        case "groupes":
+          return (
+            <Groupes
+              reload={loadData}
+            />
+          );
       default:
         return null;
     }

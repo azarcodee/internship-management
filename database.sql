@@ -100,3 +100,33 @@ INSERT INTO stages (etudiant_id, etablissement_id, service_id, date_debut, date_
 (2, 1, 5, '2025-03-01', '2025-04-01', 'en_cours', 2),
 (3, 2, 7, '2025-03-10', '2025-04-10', 'en_cours', 2),
 (4, 3, 9, '2025-04-01', '2025-05-01', 'en_attente', 2);
+
+
+
+
+CREATE TABLE groupes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nom VARCHAR(100) NOT NULL,
+  description VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE groupe_etudiants (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  groupe_id INT NOT NULL,
+  etudiant_id INT NOT NULL,
+  FOREIGN KEY (groupe_id) REFERENCES groupes(id) ON DELETE CASCADE,
+  FOREIGN KEY (etudiant_id) REFERENCES etudiants(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_membership (groupe_id, etudiant_id)
+);
+
+-- Seed data
+INSERT INTO groupes (nom, description) VALUES
+('Groupe A', 'Stage CHU Oran - Réanimation'),
+('Groupe B', 'Stage EPH Ain Temouchent - Maternité'),
+('Groupe C', 'Stage EPSP Bir El Djir');
+
+INSERT INTO groupe_etudiants (groupe_id, etudiant_id) VALUES
+(1, 1), (1, 3),
+(2, 2),
+(3, 4), (3, 1);
