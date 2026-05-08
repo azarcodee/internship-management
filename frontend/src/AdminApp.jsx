@@ -9,6 +9,7 @@ import { Reports } from "./components/sections/Reports";
 import { useAuth } from "./context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Groupes } from "./components/sections/Groupes";
+import { Utilisateurs } from "./components/sections/Utilisateurs";
 
 const API_BASE = "http://localhost/internship-management/backend";
 
@@ -118,6 +119,8 @@ export default function AdminApp() {
               reload={loadData}
             />
           );
+        case "utilisateurs":
+          return <Utilisateurs />;
       default:
         return null;
     }

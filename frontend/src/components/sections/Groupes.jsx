@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   X,
   Lock,
+  Search,
 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { Button } from "../ui/button";
@@ -27,7 +28,7 @@ import {
 export function Groupes() {
   const [groupes, setGroupes] = useState([]);
   const [etudiants, setEtudiants] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
@@ -40,6 +41,8 @@ export function Groupes() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [allDataLoaded, setAllDataLoaded] = useState(false);
+  const [search, setSearch] = useState("");
+  const [groupFormError, setGroupFormError] = useState("");
 
   // Auto-dismiss message after 5 seconds
   useEffect(() => {
@@ -49,14 +52,12 @@ export function Groupes() {
     }
   }, [message]);
 
-  // ── Load ALL groupes with their students on mount ──
+  // Load ALL groupes with their students on mount
   async function loadAllGroupesWithStudents() {
     setLoading(true);
     try {
-      // First, get the list of all groupes
       const listData = await apiFetch("/groupes.php");
       if (listData && !listData.error && Array.isArray(listData)) {
-        // For each groupe, fetch its full detail (with students)
         const groupesWithStudents = await Promise.all(
           listData.map(async (g) => {
             try {
@@ -96,19 +97,18 @@ export function Groupes() {
     loadEtudiants();
   }, []);
 
-  // Reload groupes (after save/delete) — also load students
+  // Reload groupes (after save/delete)
   async function reloadGroupes() {
     setAllDataLoaded(false);
     await loadAllGroupesWithStudents();
   }
 
-  // ── Build blocked students map ──
+  // Build blocked students map
   const blockedMap = useMemo(() => {
     const map = {};
     for (const groupe of groupes) {
       if (groupe.etudiants && groupe.etudiants.length > 0) {
         for (const etudiant of groupe.etudiants) {
-          // When editing, exclude current group's students from blocking
           if (!editId || groupe.id !== editId) {
             map[etudiant.id] = groupe.nom;
           }
@@ -118,15 +118,33 @@ export function Groupes() {
     return map;
   }, [groupes, editId]);
 
-  // Toggle expand
+  // Filtered groupes by search
+  const filteredGroupes = useMemo(() => {
+    const q = search.toLowerCase();
+    return groupes.filter((g) => {
+      const studentNames = g.etudiants
+        ? g.etudiants.map((e) => `${e.prenom} ${e.nom}`).join(" ")
+        : "";
+      return `${g.nom} ${g.description ?? ""} ${studentNames}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [groupes, search]);
+
+  // Toggle expand (supports multiple open)
   function handleToggle(id) {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   // Open add modal
   function openAdd() {
     setForm({ nom: "", description: "", etudiant_ids: [] });
     setEditId(null);
+    setGroupFormError("");
     setModalOpen(true);
   }
 
@@ -141,22 +159,63 @@ export function Groupes() {
       description: groupe.description ?? "",
       etudiant_ids: studentIds,
     });
+    setGroupFormError("");
     setModalOpen(true);
   }
 
-  // Toggle student
+  // Toggle student — only allow same speciality + same year
   function toggleStudent(etudiantId, blockingGroup) {
-    // Blocked students can't be ADDED, but can be REMOVED if already selected
     if (blockingGroup && !form.etudiant_ids.includes(etudiantId)) {
       return;
     }
 
-    setForm((f) => {
-      const ids = f.etudiant_ids.includes(etudiantId)
-        ? f.etudiant_ids.filter((i) => i !== etudiantId)
-        : [...f.etudiant_ids, etudiantId];
-      return { ...f, etudiant_ids: ids };
-    });
+    const etudiant = etudiants.find((e) => e.id === etudiantId);
+    if (!etudiant) return;
+
+    // If already selected, always allow deselecting
+    if (form.etudiant_ids.includes(etudiantId)) {
+      setForm((f) => ({
+        ...f,
+        etudiant_ids: f.etudiant_ids.filter((i) => i !== etudiantId),
+      }));
+      setGroupFormError("");
+      return;
+    }
+
+    // If this is the first student being added, allow it
+    if (form.etudiant_ids.length === 0) {
+      setForm((f) => ({
+        ...f,
+        etudiant_ids: [...f.etudiant_ids, etudiantId],
+      }));
+      setGroupFormError("");
+      return;
+    }
+
+    // Check if the new student matches the existing ones
+    const firstSelectedId = form.etudiant_ids[0];
+    const firstSelected = etudiants.find((e) => e.id === firstSelectedId);
+
+    if (!firstSelected) return;
+
+    if (
+      etudiant.specialite !== firstSelected.specialite ||
+      etudiant.annee !== firstSelected.annee
+    ) {
+      setGroupFormError(
+        `Tous les étudiants doivent être de la même spécialité et année. ` +
+        `Le groupe contient "${firstSelected.specialite} — ${firstSelected.annee}ème année", ` +
+        `mais "${etudiant.prenom} ${etudiant.nom}" est en "${etudiant.specialite} — ${etudiant.annee}ème année".`
+      );
+      return;
+    }
+
+    // All good — add the student
+    setForm((f) => ({
+      ...f,
+      etudiant_ids: [...f.etudiant_ids, etudiantId],
+    }));
+    setGroupFormError("");
   }
 
   // Save
@@ -165,13 +224,11 @@ export function Groupes() {
       setMessage({ type: "error", text: "Le nom du groupe est requis." });
       return;
     }
-
     const payload = {
       nom: form.nom.trim(),
       description: form.description?.trim() || null,
       etudiant_ids: form.etudiant_ids,
     };
-
     setSaveLoading(true);
     try {
       let result;
@@ -186,10 +243,8 @@ export function Groupes() {
           body: JSON.stringify(payload),
         });
       }
-
       if (result && !result.error) {
         setModalOpen(false);
-        setExpandedId(null);
         setMessage({
           type: "success",
           text: editId
@@ -218,7 +273,6 @@ export function Groupes() {
       });
       if (result && !result.error) {
         setDeleteId(null);
-        setExpandedId(null);
         setMessage({ type: "success", text: "Groupe supprimé avec succès." });
         await reloadGroupes();
       } else {
@@ -234,16 +288,14 @@ export function Groupes() {
     }
   }
 
-  // ── Spec colors ──
+  // Spec colors
   const specColors = {
     Infirmier: { bg: "rgba(59,130,246,0.08)", color: "#2563eb" },
     Kinesitherapie: { bg: "rgba(5,150,105,0.08)", color: "#059669" },
     "Sage-femme": { bg: "rgba(219,39,119,0.08)", color: "#db2777" },
     Laboratoire: { bg: "rgba(184,134,11,0.08)", color: "#b8860b" },
     Radiologie: { bg: "rgba(124,58,237,0.08)", color: "#7c3aed" },
-    Pharmacie: { bg: "rgba(6,182,212,0.08)", color: "#0891b2" },
-    Anesthesie: { bg: "rgba(234,88,12,0.08)", color: "#ea580c" },
-    Nutrition: { bg: "rgba(101,163,13,0.08)", color: "#65a30d" },
+    "Préparateur en Pharmacie": { bg: "rgba(6,182,212,0.08)", color: "#0891b2" },
   };
 
   return (
@@ -280,6 +332,27 @@ export function Groupes() {
         </div>
       )}
 
+      {/* Search bar */}
+      <div className="relative">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4"
+          style={{ color: "#999" }}
+        />
+        <input
+          className="w-full pl-11 pr-4 py-3 rounded-xl text-sm"
+          style={{
+            background: "#faf9f7",
+            border: "1px solid #e0ddd8",
+            color: "#1a1a1a",
+            outline: "none",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+          placeholder="Rechercher un groupe ou un étudiant…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -306,14 +379,14 @@ export function Groupes() {
       {loading && !allDataLoaded && (
         <p className="text-sm text-center py-8" style={{ color: "#999" }}>Chargement...</p>
       )}
-      {!loading && allDataLoaded && groupes.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: "#999" }}>Aucun groupe créé.</p>
+      {!loading && allDataLoaded && filteredGroupes.length === 0 && (
+        <p className="text-sm text-center py-8" style={{ color: "#999" }}>Aucun groupe trouvé.</p>
       )}
 
       {/* Groupes list */}
       <div className="space-y-3">
-        {groupes.map((groupe) => {
-          const isExpanded = expandedId === groupe.id;
+        {filteredGroupes.map((groupe) => {
+          const isExpanded = expandedIds.has(groupe.id);
           const students = groupe.etudiants ?? [];
 
           return (
@@ -381,6 +454,7 @@ export function Groupes() {
                               <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                                 style={{ background: sc.bg, color: sc.color, fontSize: "10px" }}>
                                 {etudiant.specialite} — {etudiant.annee}ème année
+                                {etudiant.classe && ` · ${etudiant.classe}`}
                               </span>
                             </div>
                           </div>
@@ -401,7 +475,7 @@ export function Groupes() {
           <DialogHeader>
             <DialogTitle>{editId ? "Modifier le groupe" : "Ajouter un groupe"}</DialogTitle>
             <DialogDescription>
-              Les étudiants déjà dans un autre groupe sont verrouillés et ne peuvent pas être sélectionnés.
+              Les étudiants doivent avoir la même spécialité et année. Les étudiants incompatibles sont grisés.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
@@ -416,55 +490,153 @@ export function Groupes() {
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Stage CHU Oran..." />
             </div>
+
+            {/* Student selection */}
             <div>
-              <Label>Étudiants ({form.etudiant_ids.length} sélectionné(s))</Label>
-              <div className="max-h-56 overflow-y-auto rounded-xl p-1"
-                style={{ border: "1px solid #e0ddd8", background: "#fff" }}>
+              <Label>
+                Étudiants ({form.etudiant_ids.length} sélectionné(s))
+                {form.etudiant_ids.length > 0 && (
+                  <span style={{ color: "#7c3aed", fontWeight: 400 }}>
+                    {" "}— {etudiants.find((e) => e.id === form.etudiant_ids[0])?.specialite}{" "}
+                    {etudiants.find((e) => e.id === form.etudiant_ids[0])?.annee}ème année
+                  </span>
+                )}
+              </Label>
+
+              {/* Group form error */}
+              {groupFormError && (
+                <div
+                  className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-medium mb-2"
+                  style={{
+                    background: "#FFF6E6",
+                    border: "1px solid rgba(251,191,36,0.35)",
+                    color: "#92400E",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                >
+                  <AlertCircle
+                    size={14}
+                    style={{ color: "#b8860b", flexShrink: 0, marginTop: 1 }}
+                  />
+                  <span>{groupFormError}</span>
+                </div>
+              )}
+
+              <div
+                className="max-h-56 overflow-y-auto rounded-xl p-1"
+                style={{ border: "1px solid #e0ddd8", background: "#fff" }}
+              >
                 {etudiants.map((etudiant) => {
                   const isSelected = form.etudiant_ids.includes(etudiant.id);
                   const blockingGroup = blockedMap[etudiant.id];
                   const isBlocked = !!blockingGroup && !isSelected;
 
+                  // Determine if this student can be added (same spec+year as current selection)
+                  const firstSelectedId = form.etudiant_ids[0];
+                  const firstSelected = firstSelectedId
+                    ? etudiants.find((e) => e.id === firstSelectedId)
+                    : null;
+                  const isWrongSpecYear =
+                    form.etudiant_ids.length > 0 &&
+                    !isSelected &&
+                    firstSelected &&
+                    (etudiant.specialite !== firstSelected.specialite ||
+                      etudiant.annee !== firstSelected.annee);
+
                   return (
-                    <button key={etudiant.id} type="button"
+                    <button
+                      key={etudiant.id}
+                      type="button"
                       onClick={() => toggleStudent(etudiant.id, blockingGroup)}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-all"
                       style={{
-                        background: isSelected ? "rgba(124,58,237,0.08)" : "transparent",
-                        cursor: isBlocked ? "not-allowed" : "pointer",
+                        background: isSelected
+                          ? "rgba(124,58,237,0.08)"
+                          : "transparent",
+                        cursor:
+                          isBlocked || isWrongSpecYear
+                            ? "not-allowed"
+                            : "pointer",
                         border: "none",
                         fontFamily: "'DM Sans', sans-serif",
-                        opacity: isBlocked ? 0.5 : 1,
+                        opacity: isBlocked || isWrongSpecYear ? 0.5 : 1,
                       }}
-                      title={isBlocked ? `Déjà dans le groupe "${blockingGroup}"` : ""}
+                      title={
+                        isBlocked
+                          ? `Déjà dans le groupe "${blockingGroup}"`
+                          : isWrongSpecYear
+                          ? `Spécialité/année différente du groupe`
+                          : ""
+                      }
                     >
-                      <div className="w-5 h-5 rounded border flex items-center justify-center shrink-0"
+                      {/* Checkbox */}
+                      <div
+                        className="w-5 h-5 rounded border flex items-center justify-center shrink-0"
                         style={{
-                          borderColor: isSelected ? "#7c3aed" : isBlocked ? "#e0ddd8" : "#ccc",
-                          background: isSelected ? "#7c3aed" : isBlocked ? "#f5f5f5" : "#fff",
-                        }}>
+                          borderColor: isSelected
+                            ? "#7c3aed"
+                            : isBlocked || isWrongSpecYear
+                            ? "#e0ddd8"
+                            : "#ccc",
+                          background: isSelected
+                            ? "#7c3aed"
+                            : isBlocked || isWrongSpecYear
+                            ? "#f5f5f5"
+                            : "#fff",
+                        }}
+                      >
                         {isSelected && (
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                            stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
                         )}
-                        {isBlocked && <Lock size={9} style={{ color: "#ccc" }} />}
+                        {(isBlocked || isWrongSpecYear) && (
+                          <Lock size={9} style={{ color: "#ccc" }} />
+                        )}
                       </div>
+
+                      {/* Student info */}
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium" style={{ color: isBlocked ? "#aaa" : "#1a1a1a" }}>
+                        <span
+                          className="font-medium"
+                          style={{
+                            color:
+                              isBlocked || isWrongSpecYear ? "#aaa" : "#1a1a1a",
+                          }}
+                        >
                           {etudiant.prenom} {etudiant.nom}
                         </span>
-                        <span className="ml-1.5" style={{ color: "#999", fontSize: "11px" }}>
+                        <span
+                          className="ml-1.5"
+                          style={{ color: "#999", fontSize: "11px" }}
+                        >
                           {etudiant.specialite} — {etudiant.annee}ème
+                          {etudiant.classe && (
+                            <span style={{ color: "#bbb" }}> · {etudiant.classe}</span>
+                          )}
                         </span>
                       </div>
+
+                      {/* Badge */}
                       {isBlocked && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
                           style={{
-                            background: "#f5f5f5", color: "#bbb",
-                            border: "1px solid #e0ddd8", fontSize: "10px",
-                          }}>
+                            background: "#f5f5f5",
+                            color: "#bbb",
+                            border: "1px solid #e0ddd8",
+                            fontSize: "10px",
+                          }}
+                        >
                           <Lock size={9} className="inline mr-1" />
                           {blockingGroup}
                         </span>
@@ -474,7 +646,7 @@ export function Groupes() {
                 })}
               </div>
               <p className="mt-1.5 text-xs" style={{ color: "#999" }}>
-                Les étudiants grisés sont déjà dans un autre groupe.
+                Tous les étudiants d'un groupe doivent avoir la même spécialité et année. Les étudiants incompatibles sont grisés.
               </p>
             </div>
           </div>

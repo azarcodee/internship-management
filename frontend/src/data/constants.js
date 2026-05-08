@@ -16,9 +16,7 @@ export const SPECIALITES = [
   "Sage-femme",
   "Laboratoire",
   "Radiologie",
-  "Pharmacie",
-  "Anesthesie",
-  "Nutrition",
+  "Préparateur en Pharmacie",
   "Autre",
 ];
 

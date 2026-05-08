@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Stethoscope } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Pencil, Trash2, Stethoscope, Search } from "lucide-react";
 import { apiFetch, API_BASE } from "../../lib/api";
 import { Button } from "../ui/button";
 import { Input, Label } from "../ui/input";
@@ -15,6 +15,7 @@ import { Combobox } from "../ui/combobox";
 import { genId } from "../../data/constants";
 
 export function Services({ services, setServices, etablissements, reload }) {
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({
@@ -22,13 +23,23 @@ export function Services({ services, setServices, etablissements, reload }) {
     etablissement_id: etablissements[0]?.id ?? "",
   });
   const [deleteId, setDeleteId] = useState(null);
-  const [filterEtab, setFilterEtab] = useState("all");
 
   const etablissementOptions = etablissements.map((e) => ({
     value: String(e.id),
     label: e.nom,
     sub: e.type ?? undefined,
   }));
+
+  // Filter by search
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return services.filter((s) => {
+      const etab = etablissements.find((e) => e.id === s.etablissement_id);
+      return `${s.nom} ${etab?.nom ?? ""} ${etab?.type ?? ""} ${etab?.wilaya ?? ""}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [services, etablissements, search]);
 
   function openAdd() {
     setForm({ nom: "", etablissement_id: etablissements[0]?.id ?? "" });
@@ -82,13 +93,29 @@ export function Services({ services, setServices, etablissements, reload }) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  const filtered =
-    filterEtab === "all"
-      ? services
-      : services.filter((s) => s.etablissement_id === Number(filterEtab));
-
   return (
     <div className="space-y-6">
+      {/* ── Search bar ── */}
+      <div className="relative">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4"
+          style={{ color: "#999" }}
+        />
+        <input
+          className="w-full pl-11 pr-4 py-3 rounded-xl text-sm"
+          style={{
+            background: "#faf9f7",
+            border: "1px solid #e0ddd8",
+            color: "#1a1a1a",
+            outline: "none",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+          placeholder="Rechercher un service…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h2
@@ -124,31 +151,6 @@ export function Services({ services, setServices, etablissements, reload }) {
         >
           <Plus size={15} /> Ajouter
         </button>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {["all", ...etablissements.map((e) => String(e.id))].map((id) => {
-          const label =
-            id === "all"
-              ? "Tous"
-              : (etablissements.find((e) => String(e.id) === id)?.nom ?? id);
-          const active = filterEtab === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setFilterEtab(id)}
-              className="px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer"
-              style={{
-                background: active ? "#1a1a1a" : "#fff",
-                color: active ? "#fff" : "#666",
-                border: active ? "1px solid #1a1a1a" : "1px solid #e0ddd8",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
       </div>
 
       <div
@@ -226,14 +228,6 @@ export function Services({ services, setServices, etablissements, reload }) {
                           color: "#2563eb",
                           border: "1px solid rgba(59,130,246,0.15)",
                         }}
-                        onMouseEnter={(ev) => {
-                          ev.currentTarget.style.background =
-                            "rgba(59,130,246,0.15)";
-                        }}
-                        onMouseLeave={(ev) => {
-                          ev.currentTarget.style.background =
-                            "rgba(59,130,246,0.08)";
-                        }}
                       >
                         <Pencil size={12} /> Modifier
                       </button>
@@ -244,14 +238,6 @@ export function Services({ services, setServices, etablissements, reload }) {
                           background: "rgba(192,57,43,0.06)",
                           color: "#c0392b",
                           border: "1px solid rgba(192,57,43,0.12)",
-                        }}
-                        onMouseEnter={(ev) => {
-                          ev.currentTarget.style.background =
-                            "rgba(192,57,43,0.12)";
-                        }}
-                        onMouseLeave={(ev) => {
-                          ev.currentTarget.style.background =
-                            "rgba(192,57,43,0.06)";
                         }}
                       >
                         <Trash2 size={12} />

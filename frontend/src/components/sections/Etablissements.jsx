@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Building2, MapPin, Tag } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Pencil, Trash2, Building2, MapPin, Tag, Search } from "lucide-react";
 import { apiFetch, API_BASE } from "../../lib/api";
 import { Button } from "../ui/button";
 import { Input, Label } from "../ui/input";
@@ -37,10 +37,19 @@ export function Etablissements({
   services,
   reload,
 }) {
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [deleteId, setDeleteId] = useState(null);
+
+  // Filter by search
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return etablissements.filter((h) =>
+      `${h.nom} ${h.type} ${h.wilaya ?? ""}`.toLowerCase().includes(q)
+    );
+  }, [etablissements, search]);
 
   function openAdd() {
     setForm({ ...EMPTY_FORM });
@@ -105,6 +114,27 @@ export function Etablissements({
 
   return (
     <div className="space-y-6">
+      {/* ── Search bar ── */}
+      <div className="relative">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4"
+          style={{ color: "#999" }}
+        />
+        <input
+          className="w-full pl-11 pr-4 py-3 rounded-xl text-sm"
+          style={{
+            background: "#faf9f7",
+            border: "1px solid #e0ddd8",
+            color: "#1a1a1a",
+            outline: "none",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+          placeholder="Rechercher un établissement…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h2
@@ -142,8 +172,14 @@ export function Etablissements({
         </button>
       </div>
 
+      {filtered.length === 0 && (
+        <p className="text-sm text-center py-8" style={{ color: "#999" }}>
+          Aucun établissement trouvé.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {etablissements.map((h) => {
+        {filtered.map((h) => {
           const serviceCount = services.filter(
             (s) => s.etablissement_id === h.id,
           ).length;

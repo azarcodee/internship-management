@@ -54,35 +54,14 @@ switch ($method) {
 
     case 'POST':
         $data = body();
-        $required = ['etablissement_id', 'service_id', 'date_debut', 'date_fin'];
-        foreach ($required as $field) {
-            if (empty($data[$field])) jsonError("$field est requis");
-        }
 
-        // ── DATE VALIDATION ──
-        $date_debut = $data['date_debut'];
-        $date_fin   = $data['date_fin'];
-
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_debut) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_fin)) {
-            jsonError("Format de date invalide. Utilisez YYYY-MM-DD.");
-        }
-
-        if ($date_fin < $date_debut) {
-            jsonError("La date de fin ne peut pas être antérieure à la date de début.");
-        }
-
-        if ($date_fin === $date_debut) {
-            jsonError("La date de fin ne peut pas être identique à la date de début.");
-        }
-
-        // ── Require groupe_id ──
-        if (empty($data['groupe_id'])) {
-            jsonError("Veuillez sélectionner un groupe.");
-        }
+        if (empty($data['etablissement_id'])) jsonError("etablissement_id est requis");
+        if (empty($data['service_id'])) jsonError("service_id est requis");
+        if (empty($data['groupe_id'])) jsonError("groupe_id est requis");
 
         $groupeId = (int)$data['groupe_id'];
 
-        // Get all students in this group
+        // Get students in this group
         $studentsStmt = $db->prepare("SELECT id FROM etudiants WHERE groupe_id = ?");
         $studentsStmt->execute([$groupeId]);
         $studentIds = $studentsStmt->fetchAll(\PDO::FETCH_COLUMN);
@@ -93,7 +72,7 @@ switch ($method) {
 
         $insertStmt = $db->prepare(
             "INSERT INTO stages (etudiant_id, etablissement_id, service_id, groupe_id, date_debut, date_fin, statut, observations)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)"
         );
 
         $insertedIds = [];
@@ -103,8 +82,6 @@ switch ($method) {
                 (int)$data['etablissement_id'],
                 (int)$data['service_id'],
                 $groupeId,
-                $date_debut,
-                $date_fin,
                 $data['statut'] ?? 'en_attente',
                 $data['observations'] ?? null,
             ]);
@@ -112,102 +89,81 @@ switch ($method) {
         }
 
         json([
-            'message' => count($insertedIds) . ' stage(s) créé(s) pour le groupe.',
+            'message' => count($insertedIds) . ' stage(s) créé(s).',
             'count' => count($insertedIds),
-            'ids' => $insertedIds,
         ], 201);
         break;
 
-    case 'PUT':
-        if (!$id) jsonError("id requis");
-        $data = body();
+        case 'PUT':
+            if (!$id) jsonError("id requis");
+            $data = body();
 
-        // ── Get the current stage to find its groupe_id ──
-        $currentStmt = $db->prepare("SELECT * FROM stages WHERE id = ?");
-        $currentStmt->execute([$id]);
-        $current = $currentStmt->fetch();
-        if (!$current) jsonError("Stage introuvable", 404);
+            // Get the current stage
+            $currentStmt = $db->prepare("SELECT * FROM stages WHERE id = ?");
+            $currentStmt->execute([$id]);
+            $current = $currentStmt->fetch();
+            if (!$current) jsonError("Stage introuvable", 404);
 
-        // ── DATE VALIDATION (only if both dates are provided) ──
-        $date_debut = !empty($data['date_debut']) ? $data['date_debut'] : $current['date_debut'];
-        $date_fin   = !empty($data['date_fin']) ? $data['date_fin'] : $current['date_fin'];
-
-        if (!empty($data['date_debut']) || !empty($data['date_fin'])) {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_debut) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_fin)) {
-                jsonError("Format de date invalide. Utilisez YYYY-MM-DD.");
-            }
-            if ($date_fin < $date_debut) {
-                jsonError("La date de fin ne peut pas être antérieure à la date de début.");
-            }
-            if ($date_fin === $date_debut) {
-                jsonError("La date de fin ne peut pas être identique à la date de début.");
-            }
-        }
-
-        // ── Determine what to update ──
-        // "observations" → update ONLY this specific student's stage
-        // "statut", "date_debut", "date_fin" → update ALL stages in the same groupe
-        // "observations_only" flag → sent from frontend when editing observations
-
-        if (!empty($data['observations_only'])) {
-            // Update only this specific stage's observations
-            $stmt = $db->prepare("UPDATE stages SET observations=? WHERE id=?");
-            $stmt->execute([$data['observations'] ?? null, $id]);
-        } else {
-            // Update ALL stages for the same groupe (statut, dates)
             $groupeId = $current['groupe_id'];
-            if ($groupeId) {
-                $stmt = $db->prepare(
-                    "UPDATE stages
-                     SET statut=?, date_debut=?, date_fin=?
-                     WHERE groupe_id=?"
-                );
-                $stmt->execute([
-                    $data['statut'] ?? $current['statut'],
-                    $date_debut,
-                    $date_fin,
-                    $groupeId,
-                ]);
-            } else {
-                // No groupe — update only this stage
-                $stmt = $db->prepare(
-                    "UPDATE stages SET statut=?, date_debut=?, date_fin=?, observations=? WHERE id=?"
-                );
-                $stmt->execute([
-                    $data['statut'] ?? $current['statut'],
-                    $date_debut,
-                    $date_fin,
-                    $data['observations'] ?? $current['observations'],
-                    $id,
-                ]);
-            }
-        }
 
-        $upd = $db->prepare("SELECT * FROM stages WHERE id = ?");
-        $upd->execute([$id]);
-        json($upd->fetch());
-        break;
+            // Observations only — update just this one
+            if (!empty($data['observations_only'])) {
+                $stmt = $db->prepare("UPDATE stages SET observations=? WHERE id=?");
+                $stmt->execute([$data['observations'] ?? null, $id]);
+                json(['message' => 'Observation mise à jour']);
+            }
+
+            // Date update (from Tableau PDF) — update entire group
+            if (!empty($data['date_debut']) || !empty($data['date_fin'])) {
+                $date_debut = !empty($data['date_debut']) ? $data['date_debut'] : $current['date_debut'];
+                $date_fin   = !empty($data['date_fin']) ? $data['date_fin'] : $current['date_fin'];
+
+                $today = date('Y-m-d');
+                $statut = 'en_attente';
+                if ($date_debut <= $today && $date_fin >= $today) $statut = 'en_cours';
+                elseif ($date_fin < $today) $statut = 'termine';
+
+                if ($groupeId) {
+                    $stmt = $db->prepare("UPDATE stages SET date_debut=?, date_fin=?, statut=? WHERE groupe_id=?");
+                    $stmt->execute([$date_debut, $date_fin, $statut, $groupeId]);
+                } else {
+                    $stmt = $db->prepare("UPDATE stages SET date_debut=?, date_fin=?, statut=? WHERE id=?");
+                    $stmt->execute([$date_debut, $date_fin, $statut, $id]);
+                }
+                json(['message' => 'Dates mises à jour pour tout le groupe']);
+            }
+
+            // Statut update — update entire group
+            $statut = !empty($data['statut']) ? $data['statut'] : $current['statut'];
+
+            if ($groupeId) {
+                $stmt = $db->prepare("UPDATE stages SET statut=?, etablissement_id=?, service_id=? WHERE groupe_id=?");
+                $stmt->execute([$statut, (int)$data['etablissement_id'] ?? $current['etablissement_id'], (int)$data['service_id'] ?? $current['service_id'], $groupeId]);
+                json(['message' => 'Groupe entier mis à jour']);
+            } else {
+                $stmt = $db->prepare("UPDATE stages SET statut=?, etablissement_id=?, service_id=? WHERE id=?");
+                $stmt->execute([$statut, (int)$data['etablissement_id'] ?? $current['etablissement_id'], (int)$data['service_id'] ?? $current['service_id'], $id]);
+                json(['message' => 'Stage mis à jour']);
+            }
+            break;
 
     case 'DELETE':
         if (!$id) jsonError("id requis");
 
-        // Get the stage to find its groupe
         $currentStmt = $db->prepare("SELECT * FROM stages WHERE id = ?");
         $currentStmt->execute([$id]);
         $current = $currentStmt->fetch();
         if (!$current) jsonError("Stage introuvable", 404);
 
-        // Delete ALL stages for the same group
         if ($current['groupe_id']) {
             $stmt = $db->prepare("DELETE FROM stages WHERE groupe_id = ?");
             $stmt->execute([$current['groupe_id']]);
             $deleted = $stmt->rowCount();
-            json(['message' => "$deleted stage(s) supprimé(s) pour ce groupe.", 'count' => $deleted]);
+            json(['message' => "$deleted stage(s) supprimé(s)."]);
         } else {
-            // No group — delete only this one
             $stmt = $db->prepare("DELETE FROM stages WHERE id = ?");
             $stmt->execute([$id]);
-            json(['message' => 'Stage supprimé.', 'id' => $id]);
+            json(['message' => 'Stage supprimé.']);
         }
         break;
 
