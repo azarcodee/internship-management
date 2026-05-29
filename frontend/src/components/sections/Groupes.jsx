@@ -43,6 +43,8 @@ export function Groupes() {
   const [allDataLoaded, setAllDataLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [groupFormError, setGroupFormError] = useState("");
+  // NEW: mini search inside the modal
+  const [studentSearch, setStudentSearch] = useState("");
 
   // Auto-dismiss message after 5 seconds
   useEffect(() => {
@@ -118,7 +120,7 @@ export function Groupes() {
     return map;
   }, [groupes, editId]);
 
-  // Filtered groupes by search
+  // Filtered groupes by main search
   const filteredGroupes = useMemo(() => {
     const q = search.toLowerCase();
     return groupes.filter((g) => {
@@ -145,6 +147,7 @@ export function Groupes() {
     setForm({ nom: "", description: "", etudiant_ids: [] });
     setEditId(null);
     setGroupFormError("");
+    setStudentSearch("");   // reset search
     setModalOpen(true);
   }
 
@@ -160,6 +163,7 @@ export function Groupes() {
       etudiant_ids: studentIds,
     });
     setGroupFormError("");
+    setStudentSearch("");   // reset search
     setModalOpen(true);
   }
 
@@ -297,6 +301,18 @@ export function Groupes() {
     Radiologie: { bg: "rgba(124,58,237,0.08)", color: "#7c3aed" },
     "Préparateur en Pharmacie": { bg: "rgba(6,182,212,0.08)", color: "#0891b2" },
   };
+
+  // ── Filtered students for the modal (mini search) ──
+  const filteredModalStudents = useMemo(() => {
+    if (!studentSearch.trim()) return etudiants;
+    const q = studentSearch.toLowerCase();
+    return etudiants.filter(
+      (e) =>
+        e.nom.toLowerCase().includes(q) ||
+        e.prenom.toLowerCase().includes(q) ||
+        `${e.prenom} ${e.nom}`.toLowerCase().includes(q)
+    );
+  }, [etudiants, studentSearch]);
 
   return (
     <div className="space-y-6">
@@ -454,7 +470,6 @@ export function Groupes() {
                               <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                                 style={{ background: sc.bg, color: sc.color, fontSize: "10px" }}>
                                 {etudiant.specialite} — {etudiant.annee}ème année
-                                {etudiant.classe && ` · ${etudiant.classe}`}
                               </span>
                             </div>
                           </div>
@@ -522,11 +537,32 @@ export function Groupes() {
                 </div>
               )}
 
+              {/* Mini search for students */}
+              <div className="relative mb-2">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
+                  style={{ color: "#999" }}
+                />
+                <input
+                  className="w-full pl-9 pr-3 py-2 rounded-xl text-xs"
+                  style={{
+                    background: "#faf9f7",
+                    border: "1px solid #e0ddd8",
+                    color: "#1a1a1a",
+                    outline: "none",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                  placeholder="Rechercher un étudiant…"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                />
+              </div>
+
               <div
                 className="max-h-56 overflow-y-auto rounded-xl p-1"
                 style={{ border: "1px solid #e0ddd8", background: "#fff" }}
               >
-                {etudiants.map((etudiant) => {
+                {filteredModalStudents.map((etudiant) => {
                   const isSelected = form.etudiant_ids.includes(etudiant.id);
                   const blockingGroup = blockedMap[etudiant.id];
                   const isBlocked = !!blockingGroup && !isSelected;

@@ -82,6 +82,7 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   const [tableauDateDebut, setTableauDateDebut] = useState("");
   const [tableauDateFin, setTableauDateFin] = useState("");
   const [tableauGroupeIds, setTableauGroupeIds] = useState([]);
+  const [tableauSearch, setTableauSearch] = useState(""); // NEW: search for groups
 
   // Lettre PDF state
   const [lettreModalOpen, setLettreModalOpen] = useState(false);
@@ -96,6 +97,7 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   const [lettreHeureFin, setLettreHeureFin] = useState("16h00");
   const [lettreDateDebut, setLettreDateDebut] = useState("");
   const [lettreDateFin, setLettreDateFin] = useState("");
+  const [lettreSearch, setLettreSearch] = useState(""); // NEW: search for students
 
   async function loadGroupesWithStudents() {
     try {
@@ -159,6 +161,25 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
       );
     });
   }, [groupes, tableauSpec, tableauAnnee]);
+
+  // NEW: filtered groups for tableau modal
+  const filteredTableauGroupes = useMemo(() => {
+    if (!tableauSearch.trim()) return tableauMatchingGroupes;
+    const q = tableauSearch.toLowerCase();
+    return tableauMatchingGroupes.filter((g) => g.nom.toLowerCase().includes(q));
+  }, [tableauMatchingGroupes, tableauSearch]);
+
+  // NEW: filtered students for lettre modal
+  const filteredLettreEtudiants = useMemo(() => {
+    if (!lettreSearch.trim()) return etudiants;
+    const q = lettreSearch.toLowerCase();
+    return etudiants.filter(
+      (e) =>
+        e.nom.toLowerCase().includes(q) ||
+        e.prenom.toLowerCase().includes(q) ||
+        `${e.prenom} ${e.nom}`.toLowerCase().includes(q)
+    );
+  }, [etudiants, lettreSearch]);
 
   useEffect(() => {
     if (filterSpec !== "all" && Number(filterAnnee) > getCursus(filterSpec)) setFilterAnnee("all");
@@ -298,6 +319,7 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
     setLettreHeureFin("16h00");
     setLettreDateDebut("");
     setLettreDateFin("");
+    setLettreSearch(""); // reset search
     setLettreModalOpen(true);
   }
 
@@ -351,6 +373,7 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
     setTableauDateDebut(new Date().toISOString().split("T")[0]);
     setTableauDateFin("");
     setTableauGroupeIds([]);
+    setTableauSearch(""); // reset search
     setTableauModalOpen(true);
   }
 
@@ -541,30 +564,42 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
             <DialogDescription>Remplissez les champs pour générer la lettre officielle.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            {/* Multi-student selection */}
+            {/* Multi-student selection with search */}
             <div>
               <Label>Étudiants ({lettreEtudiantIds.length} sélectionné(s)) <span style={{ color: "#c0392b" }}>*</span></Label>
+              {/* Search bar for students */}
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#999" }} />
+                <input
+                  className="w-full pl-9 pr-3 py-2 rounded-xl text-xs"
+                  style={{ background: "#faf9f7", border: "1px solid #e0ddd8", color: "#1a1a1a", outline: "none" }}
+                  placeholder="Rechercher un étudiant…"
+                  value={lettreSearch}
+                  onChange={(e) => setLettreSearch(e.target.value)}
+                />
+              </div>
               <div className="max-h-48 overflow-y-auto rounded-xl p-1" style={{ border: "1px solid #e0ddd8", background: "#fff" }}>
-                {etudiants.length === 0 && (
-                  <p className="text-xs text-center py-4" style={{ color: "#999" }}>Aucun étudiant disponible.</p>
+                {filteredLettreEtudiants.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: "#999" }}>Aucun étudiant trouvé.</p>
+                ) : (
+                  filteredLettreEtudiants.map((etudiant) => {
+                    const isSelected = lettreEtudiantIds.includes(etudiant.id);
+                    return (
+                      <button key={etudiant.id} type="button" onClick={() => toggleLettreEtudiant(etudiant.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-all"
+                        style={{ background: isSelected ? "rgba(124,58,237,0.08)" : "transparent", cursor: "pointer", border: "none", fontFamily: "'DM Sans', sans-serif" }}>
+                        <div className="w-5 h-5 rounded border flex items-center justify-center shrink-0"
+                          style={{ borderColor: isSelected ? "#7c3aed" : "#ccc", background: isSelected ? "#7c3aed" : "#fff" }}>
+                          {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+                        </div>
+                        <div>
+                          <span className="font-medium" style={{ color: "#1a1a1a" }}>{etudiant.prenom} {etudiant.nom}</span>
+                          <span className="ml-1.5" style={{ color: "#999", fontSize: "11px" }}>{etudiant.specialite} — {etudiant.annee}ème</span>
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
-                {etudiants.map((etudiant) => {
-                  const isSelected = lettreEtudiantIds.includes(etudiant.id);
-                  return (
-                    <button key={etudiant.id} type="button" onClick={() => toggleLettreEtudiant(etudiant.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-all"
-                      style={{ background: isSelected ? "rgba(124,58,237,0.08)" : "transparent", cursor: "pointer", border: "none", fontFamily: "'DM Sans', sans-serif" }}>
-                      <div className="w-5 h-5 rounded border flex items-center justify-center shrink-0"
-                        style={{ borderColor: isSelected ? "#7c3aed" : "#ccc", background: isSelected ? "#7c3aed" : "#fff" }}>
-                        {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
-                      </div>
-                      <div>
-                        <span className="font-medium" style={{ color: "#1a1a1a" }}>{etudiant.prenom} {etudiant.nom}</span>
-                        <span className="ml-1.5" style={{ color: "#999", fontSize: "11px" }}>{etudiant.specialite} — {etudiant.annee}ème</span>
-                      </div>
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
@@ -663,11 +698,22 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
             </div>
             <div>
               <Label>Groupes correspondants ({tableauGroupeIds.length} sélectionné(s)) <span style={{ color: "#c0392b" }}>*</span></Label>
+              {/* Search bar for groups */}
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#999" }} />
+                <input
+                  className="w-full pl-9 pr-3 py-2 rounded-xl text-xs"
+                  style={{ background: "#faf9f7", border: "1px solid #e0ddd8", color: "#1a1a1a", outline: "none" }}
+                  placeholder="Rechercher un groupe…"
+                  value={tableauSearch}
+                  onChange={(e) => setTableauSearch(e.target.value)}
+                />
+              </div>
               <div className="max-h-44 overflow-y-auto rounded-xl p-1" style={{ border: "1px solid #e0ddd8", background: "#fff" }}>
-                {tableauMatchingGroupes.length === 0 ? (
-                  <p className="text-xs text-center py-4" style={{ color: "#999" }}>Aucun groupe pour {tableauSpec} {tableauAnnee}ème.</p>
+                {filteredTableauGroupes.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: "#999" }}>Aucun groupe trouvé.</p>
                 ) : (
-                  tableauMatchingGroupes.map((g) => {
+                  filteredTableauGroupes.map((g) => {
                     const sel = tableauGroupeIds.includes(g.id);
                     return (
                       <button key={g.id} onClick={() => toggleTableauGroupe(g.id)} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
