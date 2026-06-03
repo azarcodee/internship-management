@@ -225,7 +225,7 @@ export function Groupes() {
   // Save
   async function handleSave() {
     if (!form.nom.trim()) {
-      setMessage({ type: "error", text: "Le nom du groupe est requis." });
+      setGroupFormError("Le nom du groupe est requis.");
       return;
     }
     const payload = {

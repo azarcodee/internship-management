@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, Building2, MapPin, Tag, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, MapPin, Tag, Search, AlertTriangle } from "lucide-react";
 import { apiFetch, API_BASE } from "../../lib/api";
 import { Button } from "../ui/button";
 import { Input, Label } from "../ui/input";
@@ -31,19 +31,14 @@ const TYPE_COLORS = {
   AUTRE: { bg: "rgba(100,116,139,0.08)", color: "#64748b" },
 };
 
-export function Etablissements({
-  etablissements,
-  setEtablissements,
-  services,
-  reload,
-}) {
+export function Etablissements({ etablissements, setEtablissements, services, reload }) {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [deleteId, setDeleteId] = useState(null);
+  const [formError, setFormError] = useState(""); // erreur locale
 
-  // Filter by search
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return etablissements.filter((h) =>
@@ -54,8 +49,10 @@ export function Etablissements({
   function openAdd() {
     setForm({ ...EMPTY_FORM });
     setEditId(null);
+    setFormError("");
     setModalOpen(true);
   }
+
   function openEdit(h) {
     setForm({
       nom: h.nom,
@@ -64,71 +61,54 @@ export function Etablissements({
       adresse: h.adresse ?? "",
     });
     setEditId(h.id);
+    setFormError("");
     setModalOpen(true);
   }
+
   function setField(key, val) {
     setForm((f) => ({ ...f, [key]: val }));
+    setFormError("");
   }
+
   async function handleSave() {
+    if (!form.nom.trim() || !form.wilaya.trim()) {
+      setFormError("Le nom et la wilaya sont obligatoires.");
+      return;
+    }
+
     const data = {
-      ...form,
-      adresse: form.adresse || null,
-      wilaya: form.wilaya || null,
+      nom: form.nom.trim(),
+      type: form.type,
+      wilaya: form.wilaya.trim(),
+      adresse: form.adresse.trim() || null,
     };
+
     if (editId) {
-      const result = await apiFetch(`/etablissements.php?id=${editId}`, {
-        method: "PUT",
-        body: JSON.stringify(data),
-      });
-      if (result && !result.error) {
-        await reload();
-      } else {
-        setEtablissements((prev) =>
-          prev.map((h) => (h.id === editId ? { ...data, id: editId } : h)),
-        );
-      }
+      const result = await apiFetch(`/etablissements.php?id=${editId}`, { method: "PUT", body: JSON.stringify(data) });
+      if (result && !result.error) await reload();
+      else setFormError(result?.error ?? "Erreur lors de la modification.");
     } else {
-      const result = await apiFetch("/etablissements.php", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-      if (result && !result.error) {
-        await reload();
-      } else {
-        setEtablissements((prev) => [...prev, { ...data, id: genId() }]);
-      }
+      const result = await apiFetch("/etablissements.php", { method: "POST", body: JSON.stringify(data) });
+      if (result && !result.error) await reload();
+      else setFormError(result?.error ?? "Erreur lors de l'ajout.");
     }
-    setModalOpen(false);
+    if (!formError) setModalOpen(false); // seulement si pas d'erreur
   }
+
   async function handleDelete() {
-    const result = await apiFetch(`/etablissements.php?id=${deleteId}`, {
-      method: "DELETE",
-    });
-    if (result && !result.error) {
-      await reload();
-    } else {
-      setEtablissements((prev) => prev.filter((h) => h.id !== deleteId));
-    }
+    const result = await apiFetch(`/etablissements.php?id=${deleteId}`, { method: "DELETE" });
+    if (result && !result.error) await reload();
+    else setEtablissements((prev) => prev.filter((h) => h.id !== deleteId));
     setDeleteId(null);
   }
 
   return (
     <div className="space-y-6">
-      {/* ── Search bar ── */}
       <div className="relative">
-        <Search
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4"
-          style={{ color: "#999" }}
-        />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#999" }} />
         <input
           className="w-full pl-11 pr-4 py-3 rounded-xl text-sm"
-          style={{
-            background: "#faf9f7",
-            border: "1px solid #e0ddd8",
-            color: "#1a1a1a",
-            outline: "none",
-            fontFamily: "'DM Sans', sans-serif",
-          }}
+          style={{ background: "#faf9f7", border: "1px solid #e0ddd8", color: "#1a1a1a", outline: "none", fontFamily: "'DM Sans', sans-serif" }}
           placeholder="Rechercher un établissement…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -137,260 +117,113 @@ export function Etablissements({
 
       <div className="flex items-center justify-between">
         <div>
-          <h2
-            className="text-3xl font-semibold"
-            style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              color: "#1a1a1a",
-            }}
-          >
-            Établissements
-          </h2>
-          <p
-            className="text-sm mt-1"
-            style={{ color: "#999", fontFamily: "'DM Sans', sans-serif" }}
-          >
-            {etablissements.length} établissement(s) partenaire(s)
-          </p>
+          <h2 className="text-3xl font-semibold" style={{ fontFamily: "'Cormorant Garamond', serif", color: "#1a1a1a" }}>Établissements</h2>
+          <p className="text-sm mt-1" style={{ color: "#999", fontFamily: "'DM Sans', sans-serif" }}>{etablissements.length} établissement(s) partenaire(s)</p>
         </div>
-        <button
-          onClick={openAdd}
+        <button onClick={openAdd}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer"
-          style={{
-            background: "#1a1a1a",
-            color: "#fff",
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#333";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#1a1a1a";
-          }}
-        >
+          style={{ background: "#1a1a1a", color: "#fff", fontFamily: "'DM Sans', sans-serif" }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#333"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; }}>
           <Plus size={15} /> Ajouter
         </button>
       </div>
 
-      {filtered.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: "#999" }}>
-          Aucun établissement trouvé.
-        </p>
-      )}
+      {filtered.length === 0 && <p className="text-sm text-center py-8" style={{ color: "#999" }}>Aucun établissement trouvé.</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {filtered.map((h) => {
-          const serviceCount = services.filter(
-            (s) => s.etablissement_id === h.id,
-          ).length;
+          const serviceCount = services.filter((s) => s.etablissement_id === h.id).length;
           const tc = TYPE_COLORS[h.type] ?? TYPE_COLORS.AUTRE;
           return (
-            <div
-              key={h.id}
-              className="rounded-3xl p-6 transition-all duration-200 hover:-translate-y-0.5 bg-white"
-              style={{
-                border: "1px solid #f0ede8",
-                boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-              }}
-            >
+            <div key={h.id} className="rounded-3xl p-6 transition-all duration-200 hover:-translate-y-0.5 bg-white"
+              style={{ border: "1px solid #f0ede8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
               <div className="flex items-start justify-between mb-5">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                  style={{ background: "rgba(59,130,246,0.08)" }}
-                >
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(59,130,246,0.08)" }}>
                   <Building2 size={22} style={{ color: "#2563eb" }} />
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => openEdit(h)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                    style={{
-                      background: "rgba(59,130,246,0.08)",
-                      color: "#2563eb",
-                      border: "1px solid rgba(59,130,246,0.15)",
-                    }}
-                    onMouseEnter={(ev) => {
-                      ev.currentTarget.style.background =
-                        "rgba(59,130,246,0.15)";
-                    }}
-                    onMouseLeave={(ev) => {
-                      ev.currentTarget.style.background =
-                        "rgba(59,130,246,0.08)";
-                    }}
-                  >
+                  <button onClick={() => openEdit(h)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{ background: "rgba(59,130,246,0.08)", color: "#2563eb", border: "1px solid rgba(59,130,246,0.15)" }}>
                     <Pencil size={12} /> Modifier
                   </button>
-                  <button
-                    onClick={() => setDeleteId(h.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                    style={{
-                      background: "rgba(192,57,43,0.06)",
-                      color: "#c0392b",
-                      border: "1px solid rgba(192,57,43,0.12)",
-                    }}
-                    onMouseEnter={(ev) => {
-                      ev.currentTarget.style.background =
-                        "rgba(192,57,43,0.12)";
-                    }}
-                    onMouseLeave={(ev) => {
-                      ev.currentTarget.style.background =
-                        "rgba(192,57,43,0.06)";
-                    }}
-                  >
+                  <button onClick={() => setDeleteId(h.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                    style={{ background: "rgba(192,57,43,0.06)", color: "#c0392b", border: "1px solid rgba(192,57,43,0.12)" }}>
                     <Trash2 size={12} />
                   </button>
                 </div>
               </div>
-
               <div className="flex items-center gap-2 mb-3">
-                <h3
-                  className="font-semibold text-base leading-snug"
-                  style={{
-                    color: "#1a1a1a",
-                    fontFamily: "'Cormorant Garamond', serif",
-                  }}
-                >
-                  {h.nom}
-                </h3>
-                <span
-                  className="text-xs font-bold px-2 py-0.5 rounded-lg"
-                  style={{ background: tc.bg, color: tc.color }}
-                >
-                  {h.type}
-                </span>
+                <h3 className="font-semibold text-base leading-snug" style={{ color: "#1a1a1a", fontFamily: "'Cormorant Garamond', serif" }}>{h.nom}</h3>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: tc.bg, color: tc.color }}>{h.type}</span>
               </div>
-
               <div className="space-y-2 mb-5">
-                {h.wilaya && (
-                  <div
-                    className="flex items-center gap-2 text-sm"
-                    style={{ color: "#666" }}
-                  >
-                    <MapPin size={13} className="shrink-0" />
-                    <span>Wilaya de {h.wilaya}</span>
-                  </div>
-                )}
-                {h.adresse && (
-                  <div
-                    className="flex items-center gap-2 text-sm"
-                    style={{ color: "#666" }}
-                  >
-                    <Tag size={13} className="shrink-0" />
-                    <span>{h.adresse}</span>
-                  </div>
-                )}
+                {h.wilaya && <div className="flex items-center gap-2 text-sm" style={{ color: "#666" }}><MapPin size={13} className="shrink-0" /><span>Wilaya de {h.wilaya}</span></div>}
+                {h.adresse && <div className="flex items-center gap-2 text-sm" style={{ color: "#666" }}><Tag size={13} className="shrink-0" /><span>{h.adresse}</span></div>}
               </div>
-
-              <div
-                className="flex items-center justify-between rounded-xl px-4 py-3"
-                style={{
-                  background: "rgba(59,130,246,0.06)",
-                  border: "1px solid rgba(59,130,246,0.10)",
-                }}
-              >
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "#2563eb" }}
-                >
-                  Services rattachés
-                </span>
-                <span
-                  className="text-xl font-semibold"
-                  style={{
-                    fontFamily: "'Cormorant Garamond', serif",
-                    color: "#2563eb",
-                  }}
-                >
-                  {serviceCount}
-                </span>
+              <div className="flex items-center justify-between rounded-xl px-4 py-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.10)" }}>
+                <span className="text-sm font-semibold" style={{ color: "#2563eb" }}>Services rattachés</span>
+                <span className="text-xl font-semibold" style={{ fontFamily: "'Cormorant Garamond', serif", color: "#2563eb" }}>{serviceCount}</span>
               </div>
             </div>
           );
         })}
       </div>
 
+      {/* Modal Ajout/Modification */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editId ? "Modifier l'établissement" : "Ajouter un établissement"}
-            </DialogTitle>
-            <DialogDescription>
-              Renseignez les informations de l'établissement.
-            </DialogDescription>
+            <DialogTitle>{editId ? "Modifier l'établissement" : "Ajouter un établissement"}</DialogTitle>
+            <DialogDescription>Renseignez les informations de l'établissement.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <div>
-              <Label>Nom</Label>
-              <Input
-                value={form.nom}
-                onChange={(e) => setField("nom", e.target.value)}
-                placeholder="CHU Oran"
-              />
+              <Label>Nom *</Label>
+              <Input value={form.nom} onChange={(e) => setField("nom", e.target.value)} placeholder="CHU Oran" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Type</Label>
-                <Select
-                  value={form.type}
-                  onValueChange={(v) => setField("type", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ETABLISSEMENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <Label>Type *</Label>
+                <Select value={form.type} onValueChange={(v) => setField("type", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{ETABLISSEMENT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Wilaya</Label>
-                <Input
-                  value={form.wilaya}
-                  onChange={(e) => setField("wilaya", e.target.value)}
-                  placeholder="Oran"
-                />
+                <Label>Wilaya *</Label>
+                <Input value={form.wilaya} onChange={(e) => setField("wilaya", e.target.value)} placeholder="Oran" />
               </div>
             </div>
             <div>
               <Label>Adresse (optionnelle)</Label>
-              <Input
-                value={form.adresse}
-                onChange={(e) => setField("adresse", e.target.value)}
-                placeholder="12 Rue…"
-              />
+              <Input value={form.adresse} onChange={(e) => setField("adresse", e.target.value)} placeholder="12 Rue…" />
             </div>
+            {formError && (
+              <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-medium"
+                style={{ background: "#FFF6E6", border: "1px solid rgba(251,191,36,0.35)", color: "#92400E" }}>
+                <AlertTriangle size={14} style={{ color: "#b8860b", flexShrink: 0, marginTop: 1 }} />
+                <span>{formError}</span>
+              </div>
+            )}
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleSave}>
-              {editId ? "Enregistrer" : "Ajouter"}
-            </Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>Annuler</Button>
+            <Button onClick={handleSave}>{editId ? "Enregistrer" : "Ajouter"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Modal Suppression */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Supprimer l'établissement</DialogTitle>
-            <DialogDescription>
-              Cet établissement sera définitivement supprimé.
-            </DialogDescription>
+            <DialogDescription>Cet établissement sera définitivement supprimé.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              <Trash2 size={14} /> Supprimer
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Annuler</Button>
+            <Button variant="destructive" onClick={handleDelete}><Trash2 size={14} /> Supprimer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

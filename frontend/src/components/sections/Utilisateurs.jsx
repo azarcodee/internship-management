@@ -32,6 +32,9 @@ export function Utilisateurs() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState(null);
 
+  // Delete confirmation state
+  const [deleteId, setDeleteId] = useState(null);
+
   const loadUsers = async () => {
     setLoading(true);
     try {
@@ -47,7 +50,6 @@ export function Utilisateurs() {
     loadUsers();
   }, []);
 
-  // Auto‑dismiss message
   useEffect(() => {
     if (message) {
       const t = setTimeout(() => setMessage(null), 4000);
@@ -87,15 +89,15 @@ export function Utilisateurs() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer cet utilisateur ?")) return;
-    const res = await apiFetch(`/users.php?id=${id}`, { method: "DELETE" });
+  const handleDelete = async () => {
+    const res = await apiFetch(`/users.php?id=${deleteId}`, { method: "DELETE" });
     if (res && !res.error) {
       setMessage({ type: "success", text: "Utilisateur supprimé." });
       loadUsers();
     } else {
       setMessage({ type: "error", text: res?.error || "Erreur." });
     }
+    setDeleteId(null);
   };
 
   return (
@@ -219,7 +221,7 @@ export function Utilisateurs() {
                 </td>
                 <td className="px-5 py-3.5">
                   <button
-                    onClick={() => handleDelete(u.id)}
+                    onClick={() => setDeleteId(u.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={{
                       background: "rgba(192,57,43,0.06)",
@@ -326,6 +328,26 @@ export function Utilisateurs() {
               Annuler
             </Button>
             <Button onClick={handleSave}>Ajouter</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Supprimer l'utilisateur</DialogTitle>
+            <DialogDescription>
+              Cette action est irréversible. Êtes-vous sûr de vouloir supprimer cet utilisateur ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDeleteId(null)}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 size={14} /> Supprimer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

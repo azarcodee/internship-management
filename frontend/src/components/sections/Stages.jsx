@@ -82,7 +82,8 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   const [tableauDateDebut, setTableauDateDebut] = useState("");
   const [tableauDateFin, setTableauDateFin] = useState("");
   const [tableauGroupeIds, setTableauGroupeIds] = useState([]);
-  const [tableauSearch, setTableauSearch] = useState(""); // NEW: search for groups
+  const [tableauSearch, setTableauSearch] = useState("");
+  const [tableauFormError, setTableauFormError] = useState("");
 
   // Lettre PDF state
   const [lettreModalOpen, setLettreModalOpen] = useState(false);
@@ -97,7 +98,8 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   const [lettreHeureFin, setLettreHeureFin] = useState("16h00");
   const [lettreDateDebut, setLettreDateDebut] = useState("");
   const [lettreDateFin, setLettreDateFin] = useState("");
-  const [lettreSearch, setLettreSearch] = useState(""); // NEW: search for students
+  const [lettreSearch, setLettreSearch] = useState("");
+  const [lettreFormError, setLettreFormError] = useState("");
 
   async function loadGroupesWithStudents() {
     try {
@@ -162,14 +164,12 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
     });
   }, [groupes, tableauSpec, tableauAnnee]);
 
-  // NEW: filtered groups for tableau modal
   const filteredTableauGroupes = useMemo(() => {
     if (!tableauSearch.trim()) return tableauMatchingGroupes;
     const q = tableauSearch.toLowerCase();
     return tableauMatchingGroupes.filter((g) => g.nom.toLowerCase().includes(q));
   }, [tableauMatchingGroupes, tableauSearch]);
 
-  // NEW: filtered students for lettre modal
   const filteredLettreEtudiants = useMemo(() => {
     if (!lettreSearch.trim()) return etudiants;
     const q = lettreSearch.toLowerCase();
@@ -237,7 +237,13 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   }
 
   function openEdit(st) {
-    setForm({ groupe_id: st.groupe_id ?? "", etablissement_id: st.etablissement_id, service_id: st.service_id, statut: st.statut, observations: "" });
+    setForm({
+      groupe_id: st.groupe_id ?? "",
+      etablissement_id: st.etablissement_id,
+      service_id: st.service_id,
+      statut: st.statut,
+      observations: "",
+    });
     setEditId(st.id);
     setFormError("");
     setFormWarning("");
@@ -319,23 +325,24 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
     setLettreHeureFin("16h00");
     setLettreDateDebut("");
     setLettreDateFin("");
-    setLettreSearch(""); // reset search
+    setLettreSearch("");
+    setLettreFormError("");
     setLettreModalOpen(true);
   }
 
-  // ── Toggle student for Lettre ──
   function toggleLettreEtudiant(id) {
     setLettreEtudiantIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   }
 
-  // ── Generate Lettre PDF ──
   async function handleGenerateLettrePDF() {
-    if (lettreEtudiantIds.length === 0) { setMessage({ type: "error", text: "Veuillez sélectionner au moins un étudiant." }); return; }
-    if (!lettreDateDebut || !lettreDateFin) { setMessage({ type: "error", text: "Les deux dates sont requises." }); return; }
-    if (lettreDateFin <= lettreDateDebut) { setMessage({ type: "error", text: "La date de fin doit être postérieure à la date de début." }); return; }
-    if (!lettreDestinataire.trim()) { setMessage({ type: "error", text: "Le destinataire est requis." }); return; }
+    setLettreFormError("");
+
+    if (lettreEtudiantIds.length === 0) { setLettreFormError("Veuillez sélectionner au moins un étudiant."); return; }
+    if (!lettreDateDebut || !lettreDateFin) { setLettreFormError("Les deux dates sont requises."); return; }
+    if (lettreDateFin <= lettreDateDebut) { setLettreFormError("La date de fin doit être postérieure à la date de début."); return; }
+    if (!lettreDestinataire.trim()) { setLettreFormError("Le destinataire est requis."); return; }
 
     setPdfLoading("lettre");
 
@@ -360,7 +367,7 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
       setLettreModalOpen(false);
     } catch (e) {
       console.error(e);
-      setMessage({ type: "error", text: "Erreur lors de la génération." });
+      setLettreFormError("Erreur lors de la génération du PDF.");
     }
     setPdfLoading(null);
   }
@@ -373,7 +380,8 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
     setTableauDateDebut(new Date().toISOString().split("T")[0]);
     setTableauDateFin("");
     setTableauGroupeIds([]);
-    setTableauSearch(""); // reset search
+    setTableauSearch("");
+    setTableauFormError("");
     setTableauModalOpen(true);
   }
 
@@ -382,10 +390,13 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
   }
 
   async function handleGenerateTableauPDF() {
-    if (!tableauDateDebut || !tableauDateFin) { setMessage({ type: "error", text: "Les deux dates sont requises." }); return; }
-    if (tableauDateFin <= tableauDateDebut) { setMessage({ type: "error", text: "Date fin > date début." }); return; }
-    if (!tableauDescription.trim()) { setMessage({ type: "error", text: "La description (Grade) est requise." }); return; }
-    if (!tableauGroupeIds.length) { setMessage({ type: "error", text: "Sélectionnez un groupe." }); return; }
+    setTableauFormError("");
+
+    if (!tableauDateDebut || !tableauDateFin) { setTableauFormError("Les deux dates sont requises."); return; }
+    if (tableauDateFin <= tableauDateDebut) { setTableauFormError("Date fin > date début."); return; }
+    if (!tableauDescription.trim()) { setTableauFormError("La description (Grade) est requise."); return; }
+    if (!tableauGroupeIds.length) { setTableauFormError("Sélectionnez un groupe."); return; }
+
     setPdfLoading("tableau");
     try {
       for (const gid of tableauGroupeIds) {
@@ -407,8 +418,11 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         },
       });
       setMessage({ type: "success", text: "PDF généré." });
-    } catch (e) { setMessage({ type: "error", text: "Erreur." }); }
-    setPdfLoading(null); setTableauModalOpen(false);
+      setTableauModalOpen(false);
+    } catch (e) {
+      setTableauFormError("Erreur lors de la génération du PDF.");
+    }
+    setPdfLoading(null);
   }
 
   return (
@@ -509,7 +523,6 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         </div>
       </div>
 
-      {/* Observations Dialog */}
       <Dialog open={!!observationsEditId} onOpenChange={() => setObservationsEditId(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Observation</DialogTitle></DialogHeader>
@@ -518,18 +531,30 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editId ? "Modifier" : "Ajouter"} un stage</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editId ? "Modifier le stage" : "Ajouter un stage"}</DialogTitle>
+            <DialogDescription>
+              {editId
+                ? "Les modifications de statut s'appliquent à TOUS les étudiants du même groupe."
+                : "Sélectionnez un groupe — un stage sera créé pour chaque étudiant du groupe."}
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-3 mt-2">
-            <div>
-              <Label>Groupe</Label>
-              <Combobox options={groupeOptions} value={String(form.groupe_id)} onValueChange={(v) => setField("groupe_id", v)} placeholder="Choisir…" />
-              {form.groupe_id && groupesWithStages.has(Number(form.groupe_id)) && !editId && (
-                <p className="mt-1 text-xs flex items-center gap-1" style={{ color: "#b8860b" }}><AlertCircle size={11} /> Ce groupe a déjà un stage. Continuer créera des doublons.</p>
-              )}
-            </div>
+            {/* Groupe visible uniquement en mode ajout */}
+            {!editId && (
+              <div>
+                <Label>Groupe</Label>
+                <Combobox options={groupeOptions} value={String(form.groupe_id)} onValueChange={(v) => setField("groupe_id", v)} placeholder="Choisir…" />
+                {form.groupe_id && groupesWithStages.has(Number(form.groupe_id)) && (
+                  <p className="mt-1 text-xs flex items-center gap-1" style={{ color: "#b8860b" }}>
+                    <AlertCircle size={11} /> Ce groupe a déjà un stage. Continuer créera des doublons.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div><Label>Établissement</Label><Combobox options={etablissementOptions} value={String(form.etablissement_id)} onValueChange={(v) => setField("etablissement_id", v)} placeholder="Choisir…" /></div>
             <div><Label>Service</Label><Combobox options={serviceOptions} value={String(form.service_id)} onValueChange={(v) => setField("service_id", v)} placeholder="Choisir…" disabled={!form.etablissement_id} /></div>
             <div><Label>Statut</Label><Select value={form.statut} onValueChange={(v) => setField("statut", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{STAGE_STATUTS.map((s) => <SelectItem key={s} value={s}>{statutLabel(s)}</SelectItem>)}</SelectContent></Select></div>
@@ -540,7 +565,6 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => { setDeleteId(null); setDeleteWarning(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Confirmer</DialogTitle></DialogHeader>
@@ -556,7 +580,6 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         </DialogContent>
       </Dialog>
 
-      {/* ══════ Lettre PDF Modal ══════ */}
       <Dialog open={lettreModalOpen} onOpenChange={setLettreModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -564,10 +587,8 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
             <DialogDescription>Remplissez les champs pour générer la lettre officielle.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            {/* Multi-student selection with search */}
             <div>
               <Label>Étudiants ({lettreEtudiantIds.length} sélectionné(s)) <span style={{ color: "#c0392b" }}>*</span></Label>
-              {/* Search bar for students */}
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#999" }} />
                 <input
@@ -650,6 +671,12 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
                 <Input type="date" value={lettreDateFin} onChange={(e) => setLettreDateFin(e.target.value)} />
               </div>
             </div>
+
+            {lettreFormError && (
+              <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "#FFECEC", color: "#c0392b", border: "1px solid rgba(192,57,43,0.25)" }}>
+                {lettreFormError}
+              </p>
+            )}
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setLettreModalOpen(false)}>Annuler</Button>
@@ -660,7 +687,6 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
         </DialogContent>
       </Dialog>
 
-      {/* ══════ Tableau PDF Modal ══════ */}
       <Dialog open={tableauModalOpen} onOpenChange={setTableauModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -698,7 +724,6 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
             </div>
             <div>
               <Label>Groupes correspondants ({tableauGroupeIds.length} sélectionné(s)) <span style={{ color: "#c0392b" }}>*</span></Label>
-              {/* Search bar for groups */}
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#999" }} />
                 <input
@@ -729,6 +754,12 @@ export function Stages({ stages, setStages, etudiants, etablissements, services,
                 )}
               </div>
             </div>
+
+            {tableauFormError && (
+              <p className="text-xs px-3 py-2 rounded-lg" style={{ background: "#FFECEC", color: "#c0392b", border: "1px solid rgba(192,57,43,0.25)" }}>
+                {tableauFormError}
+              </p>
+            )}
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setTableauModalOpen(false)}>Annuler</Button>
