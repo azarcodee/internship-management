@@ -350,8 +350,7 @@ export function Etudiants({ etudiants, setEtudiants, reload }) {
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-sm" style={{ color: "#666" }}>
-                    {e.annee}ème année
-                    {e.specialite === "Sage-femme" && (
+                    {e.annee === "1" || e.annee === 1 ? "1ère année" : `${e.annee}ème année`}                      {e.specialite === "Sage-femme" && (
                       <span
                         className="ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-md"
                         style={{
